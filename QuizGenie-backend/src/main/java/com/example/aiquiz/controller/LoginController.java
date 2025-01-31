@@ -1,29 +1,29 @@
 package com.example.aiquiz.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.example.aiquiz.service.LoginService;
+import com.example.aiquiz.dto.ApiResponse;
 import com.example.aiquiz.dto.LoginRequest;
 import com.example.aiquiz.dto.LoginResponse;
-
-import java.util.Arrays;
+import com.example.aiquiz.service.LoginService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class LoginController {
-    
+
     @Autowired
     private LoginService loginService;
-    
-    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse> login(@RequestBody LoginRequest request) {
         try {
-            LoginResponse response = loginService.login(request);
-            return ResponseEntity.ok(response);
+            LoginResponse loginResponse = loginService.login(request);
+            return ResponseEntity.ok(new ApiResponse(200, "登录成功", loginResponse));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(new ApiResponse(400, e.getMessage(), null));
         }
     }
 }

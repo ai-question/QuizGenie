@@ -27,13 +27,17 @@ public class FileUploadController {
     
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadFile(
-            @RequestHeader("Authorization") String token,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "totalCount", required = false) Integer totalCount,
             @RequestParam(value = "choiceCount", required = false) Integer choiceCount,
             @RequestParam(value = "judgmentCount", required = false) Integer judgmentCount,
             @RequestParam(value = "shortAnswerCount", required = false) Integer shortAnswerCount) {
         try {
+            log.debug("收到文件上传请求");
+            log.debug("文件名: {}", file.getOriginalFilename());
+            log.debug("选择题数量: {}", choiceCount);
+            log.debug("判断题数量: {}", judgmentCount);
+            log.debug("简答题数量: {}", shortAnswerCount);
+            
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body("请选择文件");
             }
@@ -43,28 +47,13 @@ public class FileUploadController {
                 return ResponseEntity.badRequest().body("文件名不能为空");
             }
             
-            String fileExtension = fileName.toLowerCase();
-            if (!fileExtension.endsWith(".pdf") && 
-                !fileExtension.endsWith(".doc") && 
-                !fileExtension.endsWith(".docx")) {
-                return ResponseEntity.badRequest().body("不支持的文件格式，仅支持 PDF 和 Word 文件");
-            }
+            // 创建配置
+            QuestionCountConfig config = new QuestionCountConfig();
+            config.setChoiceCount(choiceCount != null ? choiceCount : 2);
+            config.setJudgmentCount(judgmentCount != null ? judgmentCount : 2);
+            config.setShortAnswerCount(shortAnswerCount != null ? shortAnswerCount : 1);
             
-            QuestionCountConfig config;
-            if (totalCount != null) {
-                // 如果提供了总数，使用默认比例
-                config = QuestionCountConfig.createDefault(totalCount);
-            } else if (choiceCount != null || judgmentCount != null || shortAnswerCount != null) {
-                // 如果提供了任意类型的数量，使用指定的数量
-                config = new QuestionCountConfig();
-                config.setChoiceCount(choiceCount != null ? choiceCount : 0);
-                config.setJudgmentCount(judgmentCount != null ? judgmentCount : 0);
-                config.setShortAnswerCount(shortAnswerCount != null ? shortAnswerCount : 0);
-            } else {
-                // 如果什么都没提供，使用默认的5道题
-                config = QuestionCountConfig.createDefault(5);
-            }
-            
+            // 生成题目集
             QuestionSet questionSet = questionSetService.createQuestionSet(file, config);
             return ResponseEntity.ok(questionSet);
             
@@ -82,10 +71,16 @@ public class FileUploadController {
     
     @GetMapping("/sets/{id}")
     public ResponseEntity<?> getQuestionSet(@PathVariable Long id) {
-        QuestionSet questionSet = questionSetService.getQuestionSet(id);
-        if (questionSet == null) {
-            return ResponseEntity.notFound().build();
+        try {
+            QuestionSet questionSet = questionSetService.getQuestionSet(id);
+            if (questionSet == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(questionSet);
+        } catch (Exception e) {
+            log.error("获取题目集失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("获取题目集失败: " + e.getMessage());
         }
-        return ResponseEntity.ok(questionSet);
     }
 } 

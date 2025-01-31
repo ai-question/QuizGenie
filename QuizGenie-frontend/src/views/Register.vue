@@ -16,6 +16,28 @@
         </div>
         <div class="form-group">
           <input 
+            type="email" 
+            v-model="email" 
+            placeholder="请输入邮箱"
+            required
+            @focus="inputFocus.email = true"
+            @blur="inputFocus.email = false"
+            :class="{ 'input-focus': inputFocus.email }"
+          >
+        </div>
+        <div class="form-group">
+          <input 
+            type="text" 
+            v-model="invitationCode" 
+            placeholder="请输入邀请码"
+            required
+            @focus="inputFocus.invitationCode = true"
+            @blur="inputFocus.invitationCode = false"
+            :class="{ 'input-focus': inputFocus.invitationCode }"
+          >
+        </div>
+        <div class="form-group">
+          <input 
             type="password" 
             v-model="password" 
             placeholder="请输入密码"
@@ -61,11 +83,15 @@ import { authApi } from '../api/auth'
 
 const router = useRouter()
 const username = ref('')
+const email = ref('')
+const invitationCode = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
 const inputFocus = ref({
   username: false,
+  email: false,
+  invitationCode: false,
   password: false,
   confirm: false
 })
@@ -99,17 +125,38 @@ const handleRegister = async () => {
     return
   }
   
+  if (!isValidEmail(email.value)) {
+    ElMessage.error('请输入有效的邮箱地址')
+    return
+  }
+  
   loading.value = true
   try {
-    await authApi.register(username.value, password.value)
-    ElMessage.success('注册成功！')
-    router.push('/login')
+    const response = await authApi.register(
+      username.value, 
+      password.value, 
+      email.value,
+      invitationCode.value
+    )
+    
+    if (response.data.code === 200) {
+      ElMessage.success('注册成功！')
+      router.push('/login')
+    } else {
+      ElMessage.error(response.data.message || '注册失败，请稍后重试')
+    }
   } catch (error) {
+    console.error('注册错误:', error)
     const errorMsg = error.response?.data?.message || '注册失败，请稍后重试'
     ElMessage.error(errorMsg)
   } finally {
     loading.value = false
   }
+}
+
+const isValidEmail = (email) => {
+  const regex = /^[A-Za-z0-9+_.-]+@(.+)$/
+  return regex.test(email)
 }
 </script>
 

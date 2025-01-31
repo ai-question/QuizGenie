@@ -10,7 +10,7 @@
       >
       <button 
         @click="fetchQuestionsBySetId" 
-        class="fetch-btn"
+        class="fetch-btn" 
         :disabled="!targetSetId || loading"
       >
         <i class="fas fa-download"></i>
@@ -267,20 +267,26 @@ export default {
 
       try {
         const response = await quizApi.uploadFile(file, questionConfig.value)
-        currentSetId.value = response.data.id
         
-        uploadStatus.value = {
-          type: 'success',
-          message: '文件上传成功！正在加载题目...'
+        if (response.data) {
+          currentSetId.value = response.data.id
+          uploadStatus.value = {
+            type: 'success',
+            message: '文件上传成功！正在加载题目...'
+          }
+          
+          // 使用新的题目集ID获取题目
+          targetSetId.value = response.data.id
+          await fetchQuestionsBySetId()
+        } else {
+          throw new Error('上传响应数据格式错误')
         }
-        
-        await fetchQuestions()
       } catch (err) {
+        console.error('文件上传错误:', err)
         uploadStatus.value = {
           type: 'error',
-          message: '文件上传失败，请重试'
+          message: err.response?.data || '文件上传失败，请重试'
         }
-        console.error('文件上传错误:', err)
       }
     }
 
@@ -407,18 +413,34 @@ export default {
 
     // 新增：根据ID获取题目
     const fetchQuestionsBySetId = async () => {
-      if (!targetSetId.value) return
-      
-      loading.value = true
-      error.value = null
-      
       try {
-        currentSetId.value = targetSetId.value
-        await fetchQuestions()
-        targetSetId.value = '' // 清空输入框
+        loading.value = true
+        error.value = null
+        
+        const response = await quizApi.getQuestionSet(targetSetId.value)
+        console.log('后端返回的题目数据:', response.data) // 用于调试
+        
+        if (!response.data || !response.data.questions) {
+          throw new Error('题目数据格式错误')
+        }
+        
+        // 更新题目集信息
+        quizInfo.value = {
+          title: response.data.title,
+          description: response.data.description,
+          questionCount: response.data.questionCount
+        }
+        
+        // 直接使用后端返回的题目数据，不需要额外处理
+        questions.value = response.data.questions
+        
+        // 重置答案和结果
+        answers.value = {}
+        showResults.value = false
+        
       } catch (err) {
-        error.value = '获取题目失败，请检查题目集ID是否正确'
         console.error('获取题目错误:', err)
+        error.value = err.response?.data || err.message || '获取题目失败'
       } finally {
         loading.value = false
       }

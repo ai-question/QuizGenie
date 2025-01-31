@@ -1,6 +1,7 @@
 package com.example.aiquiz.service;
 
 import com.example.aiquiz.model.Question;
+import com.example.aiquiz.dto.QuestionCountConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,43 +51,7 @@ public class AIService {
             
             messages.add(Map.of(
                 "role", "user",
-                "content", """
-                    请根据文档内容生成5道题目，包括2道选择题、2道判断题和1道简答题。
-                    请严格按照以下格式输出，不要添加任何额外内容：
-                    
-                    【选择题1】
-                    题目：<在此处填写题目>
-                    A. <选项A>
-                    B. <选项B>
-                    C. <选项C>
-                    D. <选项D>
-                    答案：<A/B/C/D>
-                    解析：<解析内容>
-                    
-                    【选择题2】
-                    题目：<在此处填写题目>
-                    A. <选项A>
-                    B. <选项B>
-                    C. <选项C>
-                    D. <选项D>
-                    答案：<A/B/C/D>
-                    解析：<解析内容>
-                    
-                    【判断题1】
-                    题目：<在此处填写题目>
-                    答案：<只能填写：正确/错误>
-                    解析：<解析内容>
-                    
-                    【判断题2】
-                    题目：<在此处填写题目>
-                    答案：<只能填写：正确/错误>
-                    解析：<解析内容>
-                    
-                    【简答题】
-                    题目：<在此处填写题目>
-                    答案：<完整的答案内容>
-                    解析：无
-                    """
+                "content", prompt
             ));
             
             Map<String, Object> requestBody = new HashMap<>();
@@ -143,83 +108,60 @@ public class AIService {
     }
     
     private List<Question> parseAIResponseToQuestions(String aiResponse) {
+        List<Question> questions = new ArrayList<>();
         try {
-            log.debug("开始解析AI响应: {}", aiResponse);
-            
+            // 从 AI 响应中提取实际内容
             JsonNode responseNode = objectMapper.readTree(aiResponse);
             String content = responseNode.get("choices")
-                .get(0)
-                .get("message")
-                .get("content")
-                .asText();
+                                       .get(0)
+                                       .get("message")
+                                       .get("content")
+                                       .asText();
             
-            log.debug("提取的内容: {}", content);
+            // 按题目块分割（使用【】作为分隔符）
+            String[] blocks = content.split("【");
             
-            List<Question> questions = new ArrayList<>();
-            String[] questionBlocks = content.split("(?=【选择题[12]】|【判断题[12]】|【简答题】)");
-            
-            for (String block : questionBlocks) {
+            for (String block : blocks) {
                 if (block.trim().isEmpty()) continue;
                 
-                log.debug("处理题目块: {}", block);
-                Question question = parseQuestionBlock(block.trim());
+                Question question = parseQuestionBlock("【" + block);
                 if (question != null) {
                     questions.add(question);
-                    log.debug("成功解析题目: type={}, content={}", question.getType(), question.getContent());
-                } else {
-                    log.error("题目块解析失败: {}", block);
                 }
             }
             
-            return questions;
+            // 添加日志以便调试
+            log.debug("解析到 {} 道题目", questions.size());
+            if (questions.size() == 0) {
+                log.error("AI响应内容：{}", content);
+            }
             
+            return questions;
         } catch (Exception e) {
             log.error("解析AI响应失败", e);
-            throw new RuntimeException("解析AI响应失败: " + e.getMessage());
+            throw new RuntimeException("解析题目失败: " + e.getMessage());
         }
     }
     
     private Question parseQuestionBlock(String block) {
         try {
-            String[] lines = block.split("\n");
-            String type = null;
-            String content = "";
-            String answer = "";
-            String analysis = "";
-            StringBuilder contentBuilder = new StringBuilder();
-            
-            for (String line : lines) {
-                line = line.trim();
-                if (line.isEmpty()) continue;
-                
-                if (line.contains("【选择题")) {
-                    type = "选择题";
-                } else if (line.contains("【判断题")) {
-                    type = "判断题";
-                } else if (line.contains("【简答题】")) {
-                    type = "简答题";
-                } else if (line.startsWith("题目：")) {
-                    contentBuilder.append(line.substring(3)).append("\n");
-                } else if (line.startsWith("A.") || line.startsWith("B.") || 
-                          line.startsWith("C.") || line.startsWith("D.")) {
-                    contentBuilder.append(line).append("\n");
-                } else if (line.startsWith("答案：")) {
-                    answer = line.substring(3).trim();
-                } else if (line.startsWith("解析：")) {
-                    analysis = line.substring(3).trim();
-                }
-            }
-            
-            content = contentBuilder.toString().trim();
-            
-            if (type == null || content.isEmpty() || answer.isEmpty()) {
-                log.error("题目解析失败，缺少必要字段: type={}, content={}, answer={}", type, content, answer);
+            // 提取题目类型
+            String type;
+            if (block.contains("选择题")) {
+                type = "选择题";
+            } else if (block.contains("判断题")) {
+                type = "判断题";
+            } else if (block.contains("简答题")) {
+                type = "简答题";
+            } else {
                 return null;
             }
             
-            if (type.equals("简答题")) {
-                analysis = "无";
-            }
+            // 使用更健壮的方式提取题目内容
+            String content = extractBetween(block, "题目：", type.equals("选择题") ? "A." : "答案：").trim();
+            String answer = extractBetween(block, "答案：", "解析：").trim();
+            String analysis = type.equals("简答题") ? "无" : 
+                             extractAfter(block, "解析：").trim();
             
             Question question = new Question();
             question.setType(type)
@@ -228,11 +170,30 @@ public class AIService {
                     .setAnalysis(analysis);
             
             return question;
-            
         } catch (Exception e) {
             log.error("解析题目块失败: {}", block, e);
             return null;
         }
+    }
+    
+    // 辅助方法：提取两个标记之间的文本
+    private String extractBetween(String text, String start, String end) {
+        int startIndex = text.indexOf(start);
+        if (startIndex == -1) return "";
+        startIndex += start.length();
+        
+        int endIndex = text.indexOf(end, startIndex);
+        if (endIndex == -1) return text.substring(startIndex).trim();
+        
+        return text.substring(startIndex, endIndex).trim();
+    }
+    
+    // 辅助方法：提取标记之后的所有文本
+    private String extractAfter(String text, String start) {
+        int startIndex = text.indexOf(start);
+        if (startIndex == -1) return "";
+        startIndex += start.length();
+        return text.substring(startIndex).trim();
     }
     
     private Map<String, String> createMessage(String role, String content) {
@@ -271,5 +232,39 @@ public class AIService {
         } catch (Exception e) {
             throw new RuntimeException("AI服务调用失败: " + e.getMessage());
         }
+    }
+
+    public String generatePrompt(QuestionCountConfig config) {
+        return String.format("""
+            请根据文档内容生成题目，具体要求如下：
+            1. %d道选择题（每题4个选项）
+            2. %d道判断题
+            3. %d道简答题
+            
+            请按以下格式输出每道题：
+            
+            【选择题1】
+            题目：<在此处填写题目>
+            A. <选项A>
+            B. <选项B>
+            C. <选项C>
+            D. <选项D>
+            答案：<A/B/C/D>
+            解析：<解析内容>
+            
+            【判断题1】
+            题目：<在此处填写题目>
+            答案：<只能填写：正确/错误>
+            解析：<解析内容>
+            
+            【简答题1】
+            题目：<在此处填写题目>
+            答案：<完整的答案内容>
+            解析：无
+            """, 
+            config.getChoiceCount(),
+            config.getJudgmentCount(),
+            config.getShortAnswerCount()
+        );
     }
 } 

@@ -5,7 +5,14 @@
         <div class="avatar">
           <img :src="userInfo.avatar || defaultAvatar" alt="用户头像">
         </div>
-        <button class="upload-btn">
+        <input
+          type="file"
+          ref="avatarInput"
+          accept="image/*"
+          style="display: none"
+          @change="handleAvatarUpload"
+        >
+        <button class="upload-btn" @click="$refs.avatarInput.click()">
           <i class="fas fa-camera"></i>
           更换头像
         </button>
@@ -71,8 +78,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { userApi } from '../api/user'
 
 const defaultAvatar = 'https://via.placeholder.com/100'
 
@@ -81,7 +89,7 @@ const userInfo = ref({
   avatar: '',
   email: '',
   phone: '',
-  joinDate: '2024-03-20'
+  joinDate: ''
 })
 
 const userStats = ref({
@@ -89,6 +97,53 @@ const userStats = ref({
   correctRate: 0,
   streak: 0,
   rank: '-'
+})
+
+// 获取用户信息
+const fetchUserInfo = async () => {
+  try {
+    const response = await userApi.getUserInfo()
+    if (response.data.code === 200) {
+      userInfo.value = {
+        ...userInfo.value,
+        ...response.data.data
+      }
+    }
+  } catch (error) {
+    ElMessage.error('获取用户信息失败')
+  }
+}
+
+// 处理头像上传
+const handleAvatarUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  // 验证文件类型
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('请上传图片文件')
+    return
+  }
+  
+  // 验证文件大小 (2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过2MB')
+    return
+  }
+
+  try {
+    const response = await userApi.uploadAvatar(file)
+    if (response.data.code === 200) {
+      userInfo.value.avatar = response.data.data.avatarUrl
+      ElMessage.success('头像上传成功')
+    }
+  } catch (error) {
+    ElMessage.error('头像上传失败')
+  }
+}
+
+onMounted(() => {
+  fetchUserInfo()
 })
 
 const handleEdit = () => {

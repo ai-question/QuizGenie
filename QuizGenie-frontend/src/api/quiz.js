@@ -3,34 +3,38 @@ import axios from 'axios'
 // 创建axios实例
 const api = axios.create({
   timeout: 150000,
-  withCredentials: true, // 允许跨域携带 cookie
+  baseURL: '/api',
   headers: {
-    'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 })
 
-// 添加请求拦截器，设置跨域请求头
+// 请求拦截器
 api.interceptors.request.use(config => {
-  config.headers['Access-Control-Allow-Origin'] = '*'
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
   return config
 }, error => {
   return Promise.reject(error)
 })
 
-// 添加响应拦截器
+// 响应拦截器
 api.interceptors.response.use(response => {
-  console.log('收到响应:', response)
   return response
 }, error => {
-  console.error('响应错误:', error)
+  if (error.response?.status === 401) {
+    // 未登录跳转到登录页
+    window.location.href = '/login'
+  }
   return Promise.reject(error)
 })
 
 export const quizApi = {
   // 获取题目集
-  getQuestionSet(setId) {
-    return api.get(`/api/upload/sets/${setId}`)
+  getQuestionSet(id) {
+    return api.get(`/upload/sets/${id}`)
   },
 
   // 上传文件并创建题目集
@@ -41,19 +45,13 @@ export const quizApi = {
     formData.append('judgmentCount', questionConfig.judgmentCount) 
     formData.append('shortAnswerCount', questionConfig.shortAnswerCount)
     
-    const token = localStorage.getItem('token')
-    
-    return api.post('/api/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${token}`
-      }
-    })
+    // 对于文件上传，让浏览器自动处理 Content-Type 和 boundary
+    return api.post('/upload', formData)
   },
 
   // 提交答案
   submitAnswers(setId, answers) {
-    return api.post(`/api/upload/sets/${setId}/submit`, {
+    return api.post(`/upload/sets/${setId}/submit`, {
       answers
     })
   }

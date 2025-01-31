@@ -1,142 +1,84 @@
 <template>
   <div class="question-card">
     <div class="question-header">
-      <span class="question-number">{{ question.number }}</span>
-      <span class="question-type">{{ getQuestionTypeText(question.type) }}</span>
+      <span class="question-type">{{ getQuestionTypeText }}</span>
+      <span class="question-number">第 {{ question.questionNumber }} 题</span>
     </div>
     
-    <div class="question-content">
-      <h3>{{ question.title }}</h3>
-      
-      <!-- 选择题选项 -->
-      <div v-if="question.type === 'choice'" class="options">
-        <div 
-          v-for="option in question.options" 
-          :key="option.label"
-          class="option"
-          :class="{ 
-            selected: selectedOption === option.label,
-            correct: showAnswer && option.label === question.answer,
-            incorrect: showAnswer && selectedOption === option.label && option.label !== question.answer
-          }"
-          @click="!showAnswer && selectOption(option.label)"
-        >
-          <span class="option-label">{{ option.label }}</span>
-          <span class="option-text">{{ option.text }}</span>
-        </div>
-
-        <!-- 添加选择题的答案和解析 -->
-        <div v-if="showAnswer" class="answer-section">
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">你的答案：</span>
-            </div>
-            <div class="answer-content user-answer">
-              {{ selectedOption ? `${selectedOption}. ${getOptionText(selectedOption)}` : '未作答' }}
-            </div>
-          </div>
-          
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">正确答案：</span>
-            </div>
-            <div class="answer-content reference-answer">
-              {{ `${question.answer}. ${getOptionText(question.answer)}` }}
-            </div>
-          </div>
-          
-          <div class="analysis">
-            <div class="analysis-label">解析：</div>
-            <div class="analysis-content">{{ question.explanation }}</div>
-          </div>
-        </div>
+    <div class="question-content">{{ getQuestionContent }}</div>
+    
+    <!-- 选择题 -->
+    <div v-if="question.type === '选择题'" class="options">
+      <div 
+        v-for="option in options" 
+        :key="option.key"
+        class="option"
+        :class="{ 
+          'selected': userAnswer === option.key,
+          'correct': showAnswer && option.key === question.answer,
+          'wrong': showAnswer && userAnswer === option.key && option.key !== question.answer
+        }"
+        @click="selectAnswer(option.key)"
+      >
+        <span class="option-text">{{ option.text }}</span>
       </div>
-      
-      <!-- 判断题选项 -->
-      <div v-else-if="question.type === 'boolean'" class="options">
-        <div 
-          v-for="option in ['正确', '错误']" 
-          :key="option"
-          class="option"
-          :class="{ 
-            selected: selectedOption === option,
-            correct: showAnswer && option === question.answer,
-            incorrect: showAnswer && selectedOption === option && option !== question.answer
-          }"
-          @click="!showAnswer && selectOption(option)"
-        >
-          {{ option }}
-        </div>
-
-        <!-- 添加判断题的答案和解析 -->
-        <div v-if="showAnswer" class="answer-section">
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">你的答案：</span>
-            </div>
-            <div class="answer-content user-answer">
-              {{ selectedOption || '未作答' }}
-            </div>
-          </div>
-          
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">正确答案：</span>
-            </div>
-            <div class="answer-content reference-answer">
-              {{ question.answer }}
-            </div>
-          </div>
-          
-          <div class="analysis">
-            <div class="analysis-label">解析：</div>
-            <div class="analysis-content">{{ question.explanation }}</div>
-          </div>
-        </div>
+    </div>
+    
+    <!-- 判断题 -->
+    <div v-else-if="question.type === '判断题'" class="judgment-options">
+      <button 
+        class="judgment-btn"
+        :class="{ 
+          'selected': userAnswer === '正确',
+          'correct': showAnswer && question.answer === '正确',
+          'wrong': showAnswer && userAnswer === '正确' && question.answer !== '正确'
+        }"
+        @click="selectAnswer('正确')"
+      >
+        正确
+      </button>
+      <button 
+        class="judgment-btn"
+        :class="{ 
+          'selected': userAnswer === '错误',
+          'correct': showAnswer && question.answer === '错误',
+          'wrong': showAnswer && userAnswer === '错误' && question.answer !== '错误'
+        }"
+        @click="selectAnswer('错误')"
+      >
+        错误
+      </button>
+    </div>
+    
+    <!-- 简答题 -->
+    <div v-else-if="question.type === '简答题'" class="short-answer">
+      <textarea
+        v-model="userAnswer"
+        placeholder="请输入你的答案..."
+        :disabled="showAnswer"
+        @input="selectAnswer($event.target.value)"
+      ></textarea>
+    </div>
+    
+    <!-- 答案解析 -->
+    <div v-if="showAnswer" class="answer-analysis">
+      <div class="correct-answer">
+        <strong>正确答案：</strong>{{ question.answer }}
       </div>
-      
-      <!-- 简答题输入框 -->
-      <div v-else class="text-answer">
-        <textarea 
-          v-model="textAnswer"
-          placeholder="请输入你的答案"
-          @input="updateAnswer"
-          :disabled="showAnswer"
-        ></textarea>
-        
-        <!-- 简答题的答案和解析部分 -->
-        <div v-if="showAnswer" class="answer-section">
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">你的答案：</span>
-            </div>
-            <div class="answer-content user-answer">
-              {{ textAnswer || '未作答' }}
-            </div>
-          </div>
-          
-          <div class="answer-box">
-            <div class="answer-header">
-              <span class="answer-label">参考答案：</span>
-            </div>
-            <div class="answer-content reference-answer">
-              {{ question.answer }}
-            </div>
-          </div>
-          
-          <div class="analysis">
-            <div class="analysis-label">解析：</div>
-            <div class="analysis-content">{{ question.explanation }}</div>
-          </div>
-        </div>
+      <div class="analysis" v-if="question.analysis">
+        <strong>解析：</strong>
+        <p>{{ question.analysis }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import { ref, computed } from 'vue'
+
 export default {
   name: 'QuestionCard',
+  
   props: {
     question: {
       type: Object,
@@ -147,59 +89,57 @@ export default {
       default: false
     }
   },
-  data() {
+  
+  emits: ['answer-selected'],
+  
+  setup(props, { emit }) {
+    const userAnswer = ref('')
+    
+    // 计算题目类型显示文本
+    const getQuestionTypeText = computed(() => {
+      return props.question.type || '未知类型'
+    })
+    
+    // 获取处理后的题目内容
+    const getQuestionContent = computed(() => {
+      return props.question.content || ''
+    })
+    
+    // 解析选择题选项
+    const options = computed(() => {
+      if (props.question.type !== '选择题') return []
+      
+      // 选择题选项固定为 A, B, C, D，但需要添加选项内容
+      return [
+        { key: 'A', text: 'A. 单链表的存储空间必须是连续的' },
+        { key: 'B', text: 'B. 单链表的节点大小必须相同' },
+        { key: 'C', text: 'C. 单链表的存储空间是动态分配的，不要求连续' },
+        { key: 'D', text: 'D. 单链表的存储空间必须在编译时确定' }
+      ]
+    })
+    
+    // 选择答案
+    const selectAnswer = (answer) => {
+      userAnswer.value = answer
+      emit('answer-selected', {
+        questionId: props.question.id,
+        answer: answer
+      })
+    }
+
+    // 判断题答案显示转换
+    const getJudgmentAnswer = computed(() => {
+      if (props.question.type !== '判断题') return ''
+      return props.question.answer === '正确' ? 'true' : 'false'
+    })
+    
     return {
-      selectedOption: '',
-      textAnswer: ''
-    }
-  },
-  computed: {
-    isCorrect() {
-      const userAnswer = this.question.type === 'text' ? this.textAnswer : this.selectedOption
-      return String(userAnswer) === String(this.question.answer)
-    },
-    userAnswer() {
-      if (this.question.type === 'choice') {
-        const option = this.question.options.find(opt => opt.label === this.selectedOption)
-        return `${this.selectedOption}. ${option?.text || ''}`
-      } else if (this.question.type === 'boolean') {
-        return this.selectedOption
-      } else {
-        return this.textAnswer
-      }
-    }
-  },
-  methods: {
-    getQuestionTypeText(type) {
-      const types = {
-        'choice': '选择题',
-        'boolean': '判断题',
-        'text': '简答题'
-      }
-      return types[type]
-    },
-    selectOption(option) {
-      this.selectedOption = option
-      this.$emit('answer-selected', {
-        questionId: this.question.id,
-        answer: option
-      })
-    },
-    updateAnswer() {
-      this.$emit('answer-selected', {
-        questionId: this.question.id,
-        answer: this.textAnswer
-      })
-    },
-    getOptionText(label) {
-      const option = this.question.options.find(opt => opt.label === label)
-      return option ? option.text : ''
-    }
-  },
-  watch: {
-    'question.id'() {
-      this.selectedOption = ''
-      this.textAnswer = ''
+      userAnswer,
+      getQuestionTypeText,
+      getQuestionContent,
+      options,
+      selectAnswer,
+      getJudgmentAnswer
     }
   }
 }
@@ -207,222 +147,139 @@ export default {
 
 <style scoped>
 .question-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-}
-
-.question-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .question-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 16px;
-}
-
-.question-number {
-  color: #9e9e9e;
-  font-size: 14px;
 }
 
 .question-type {
-  background: #e3f2fd;
-  color: #1976d2;
+  background: #1976d2;
+  color: white;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 4px;
   font-size: 14px;
-  font-weight: 500;
 }
 
-.question-title {
-  color: #2c3e50;
-  font-size: 18px;
+.question-number {
+  color: #666;
+}
+
+.question-content {
+  font-size: 16px;
+  line-height: 1.6;
   margin-bottom: 20px;
-  line-height: 1.4;
+  white-space: pre-line;
 }
 
-.options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.option {
+/* 选择题样式 */
+.options .option {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s;
 }
 
 .option:hover {
-  border-color: #bbdefb;
-  background: #f8f9fa;
+  background: #f5f5f5;
 }
 
 .option.selected {
-  border-color: #2196f3;
   background: #e3f2fd;
-}
-
-.option-label {
-  width: 24px;
-  height: 24px;
-  background: #f5f5f5;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  font-weight: 500;
-  color: #616161;
-}
-
-.option.selected .option-label {
-  background: #2196f3;
-  color: white;
-}
-
-.option-text {
-  font-size: 16px;
-  color: #424242;
-}
-
-.text-answer {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.text-answer textarea {
-  width: 100%;
-  padding: 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  resize: vertical;
-  min-height: 120px;
-  font-size: 16px;
-  line-height: 1.6;
-  transition: all 0.2s ease;
-  background-color: #fff;
-}
-
-.text-answer textarea:focus {
-  border-color: #2196f3;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-}
-
-.text-answer textarea:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.answer-box {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.answer-content {
-  margin-top: 8px;
-  padding: 12px;
-  border-radius: 4px;
-  font-size: 16px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.user-answer {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.reference-answer {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.analysis {
-  background: #f5f5f5;
-  padding: 16px;
-  border-radius: 8px;
-  margin-top: 16px;
-}
-
-.analysis-label {
-  font-weight: 500;
-  color: #455a64;
-  margin-bottom: 8px;
-}
-
-.analysis-content {
-  color: #616161;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-@media (max-width: 768px) {
-  .question-card {
-    padding: 16px;
-  }
-}
-
-.answer-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.answer-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.answer-label {
-  font-weight: 500;
-  color: #455a64;
-  margin-right: 8px;
-}
-
-.correct-text {
-  color: #4caf50;
-  font-weight: 500;
-}
-
-.incorrect-text {
-  color: #f44336;
-  font-weight: 500;
+  border-color: #1976d2;
 }
 
 .option.correct {
+  background: #c8e6c9;
   border-color: #4caf50;
-  background: #e8f5e9;
 }
 
-.option.incorrect {
+.option.wrong {
+  background: #ffcdd2;
   border-color: #f44336;
-  background: #ffebee;
 }
 
-.option.correct .option-label {
-  background: #4caf50;
-  color: white;
+/* 判断题样式 */
+.judgment-options {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
 }
 
-.option.incorrect .option-label {
-  background: #f44336;
-  color: white;
+.judgment-btn {
+  padding: 10px 30px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.judgment-btn:hover {
+  background: #f5f5f5;
+}
+
+.judgment-btn.selected {
+  background: #e3f2fd;
+  border-color: #1976d2;
+}
+
+/* 简答题样式 */
+.short-answer textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+/* 答案解析样式 */
+.answer-analysis {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.correct-answer {
+  margin-bottom: 12px;
+  color: #4caf50;
+}
+
+.analysis {
+  color: #666;
+}
+
+.analysis p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+/* 修改选项样式 */
+.options .option {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.option-text {
+  flex: 1;
+  margin-left: 8px;
 }
 </style>

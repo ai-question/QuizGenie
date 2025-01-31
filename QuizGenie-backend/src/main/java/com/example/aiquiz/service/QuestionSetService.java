@@ -24,6 +24,9 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.HashMap;
 import com.example.aiquiz.dto.QuestionCountConfig;
+import com.example.aiquiz.model.User;
+import com.example.aiquiz.service.UserService;
+import java.time.LocalDateTime;
 
 @Service
 public class QuestionSetService {
@@ -46,6 +49,9 @@ public class QuestionSetService {
     
     @Autowired
     private ObjectMapper objectMapper;
+    
+    @Autowired
+    private UserService userService;
     
     private final RestTemplate restTemplate = new RestTemplate();
     
@@ -78,6 +84,12 @@ public class QuestionSetService {
     @Transactional
     public QuestionSet createQuestionSet(MultipartFile file, QuestionCountConfig config) {
         try {
+            // 获取当前登录用户
+            User currentUser = userService.getCurrentUser();
+            if (currentUser == null) {
+                throw new RuntimeException("用户未登录");
+            }
+            
             // 1. 从文件名生成标题
             String fileName = file.getOriginalFilename();
             if (fileName == null) {
@@ -124,42 +136,37 @@ public class QuestionSetService {
             
             // 4. 创建题目集合
             QuestionSet questionSet = new QuestionSet();
-            questionSet.setTitle(fileName)
-                      .setDescription(description)
-                      .setQuestionCount(config.getChoiceCount() + 
+            questionSet.setUserId(currentUser.getId());
+            questionSet.setTitle(fileName);
+            questionSet.setDescription(description);
+            questionSet.setQuestionCount(config.getChoiceCount() + 
                                        config.getJudgmentCount() + 
                                        config.getShortAnswerCount());
+            LocalDateTime now = LocalDateTime.now();
+            questionSet.setCreateTime(now);
+            questionSet.setUpdateTime(now);
             
             questionSetMapper.insert(questionSet);
             
-            // 5. 生成题目
-            List<Question> questions = aiService.generateQuestionsFromFile(file, String.format("""
-                请根据文档内容生成题目，具体要求如下：
-                1. %d道选择题（每题4个选项）
-                2. %d道判断题
-                3. %d道简答题
-                
-                请按以下格式输出每道题：
-                
-                【选择题1】
-                题目：...
-                A. ...
-                B. ...
-                C. ...
-                D. ...
-                答案：...
-                解析：...
-                
-                【判断题1】
-                题目：...
-                答案：...（只能回答：正确/错误）
-                解析：...
-                
-                【简答题1】
-                题目：...
-                答案：...（请给出完整的答案）
-                解析：无
-                """, config.getChoiceCount(), config.getJudgmentCount(), config.getShortAnswerCount()));
+            // 添加日志
+            log.debug("开始生成题目，配置：选择题{}道，判断题{}道，简答题{}道",
+                     config.getChoiceCount(),
+                     config.getJudgmentCount(),
+                     config.getShortAnswerCount());
+            
+            List<Question> questions = aiService.generateQuestionsFromFile(
+                file, 
+                aiService.generatePrompt(config)
+            );
+            
+            // 添加验证
+            if (questions.size() != config.getChoiceCount() + 
+                                  config.getJudgmentCount() + 
+                                  config.getShortAnswerCount()) {
+                log.error("生成的题目数量不正确，期望{}道，实际生成{}道",
+                         config.getChoiceCount() + config.getJudgmentCount() + config.getShortAnswerCount(),
+                         questions.size());
+            }
             
             // 6. 保存题目
             int questionNumber = 1;
@@ -179,15 +186,31 @@ public class QuestionSetService {
     }
     
     public QuestionSet getQuestionSet(Long id) {
-        QuestionSet questionSet = questionSetMapper.findById(id);
-        if (questionSet != null) {
-            List<Question> questions = questionMapper.findBySetId(id);
-            questionSet.setQuestions(questions);
+        // 获取当前登录用户
+        User currentUser = userService.getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("用户未登录");
         }
+        
+        // 只能获取自己的题目集
+        QuestionSet questionSet = questionSetMapper.findByIdAndUserId(id, currentUser.getId());
+        if (questionSet == null) {
+            throw new RuntimeException("题目集不存在或无权访问");
+        }
+        
+        List<Question> questions = questionMapper.findBySetId(id);
+        questionSet.setQuestions(questions);
         return questionSet;
     }
     
     public List<QuestionSet> getAllQuestionSets() {
-        return questionSetMapper.findAll();
+        // 获取当前登录用户
+        User currentUser = userService.getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("用户未登录");
+        }
+        
+        // 只返回当前用户的题目集
+        return questionSetMapper.findByUserId(currentUser.getId());
     }
 } 

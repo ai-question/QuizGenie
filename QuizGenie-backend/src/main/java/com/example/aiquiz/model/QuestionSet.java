@@ -2,9 +2,12 @@ package com.example.aiquiz.model;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.Data;
 
+@Data
 public class QuestionSet {
     private Long id;
+    private Long userId;
     private String title;
     private String description;
     private Integer questionCount;

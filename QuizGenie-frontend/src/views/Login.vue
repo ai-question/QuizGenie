@@ -68,25 +68,33 @@ onMounted(() => {
 })
 
 const handleLogin = async () => {
+  if (!username.value || !password.value) {
+    ElMessage.error('请输入用户名和密码')
+    return
+  }
+
   loading.value = true
   try {
     const response = await authApi.login(username.value, password.value)
-    const { token, username: loginUsername } = response.data
-    if (token) {
-      if (rememberMe.value) {
-        localStorage.setItem('savedUsername', username.value)
-        localStorage.setItem('savedPassword', password.value)
-      } else {
-        localStorage.removeItem('savedUsername')
-        localStorage.removeItem('savedPassword')
-      }
+    console.log('登录响应:', response.data) // 调试用
+    
+    if (response.data.code === 200) {
+      const { token, username: loginUsername } = response.data.data
       
+      // 保存登录信息
       localStorage.setItem('token', token)
       localStorage.setItem('username', loginUsername)
-      await router.push('/home')
+      
+      // 显示成功消息
       ElMessage.success(`欢迎回来，${loginUsername}！`)
+      
+      // 跳转到首页
+      await router.push('/home')
+    } else {
+      ElMessage.error(response.data.message || '登录失败，请稍后重试')
     }
   } catch (error) {
+    console.error('登录错误:', error) // 调试用
     const errorMsg = error.response?.data?.message || '登录失败，请检查用户名和密码'
     ElMessage.error(errorMsg)
   } finally {
