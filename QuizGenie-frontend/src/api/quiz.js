@@ -25,13 +25,23 @@ api.interceptors.response.use(response => {
   return response
 }, error => {
   if (error.response?.status === 401) {
+    // 清除本地存储的登录信息
+    localStorage.removeItem('token')
+    localStorage.removeItem('username')
     // 未登录跳转到登录页
-    window.location.href = '/login'
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
   }
   return Promise.reject(error)
 })
 
 export const quizApi = {
+  // 获取所有题目集
+  getAllQuestionSets() {
+    return api.get('/upload/sets')
+  },
+
   // 获取题目集
   getQuestionSet(id) {
     return api.get(`/upload/sets/${id}`)

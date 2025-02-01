@@ -1,71 +1,65 @@
 <template>
   <div class="question-card">
     <div class="question-header">
-      <span class="question-type">{{ getQuestionTypeText }}</span>
       <span class="question-number">第 {{ question.questionNumber }} 题</span>
+      <span class="question-type">{{ question.type }}</span>
     </div>
     
-    <div class="question-content">{{ getQuestionContent }}</div>
-    
-    <!-- 选择题 -->
-    <div v-if="question.type === '选择题'" class="options">
-      <div 
-        v-for="option in options" 
-        :key="option.key"
-        class="option"
-        :class="{ 
-          'selected': userAnswer === option.key,
-          'correct': showAnswer && option.key === question.answer,
-          'wrong': showAnswer && userAnswer === option.key && option.key !== question.answer
-        }"
-        @click="selectAnswer(option.key)"
-      >
-        <span class="option-text">{{ option.text }}</span>
+    <div class="question-content">
+      <h3>{{ question.content }}</h3>
+      
+      <!-- 选择题 -->
+      <div v-if="question.type === '选择题'" class="options">
+        <div
+          v-for="option in options"
+          :key="option.key"
+          class="option"
+          :class="{ 
+            'selected': answer === option.key,
+            'correct': showAnswer && option.key === question.answer,
+            'wrong': showAnswer && answer === option.key && option.key !== question.answer
+          }"
+          @click="!showAnswer && selectAnswer(option.key)"
+        >
+          <span class="option-text">{{ option.text }}</span>
+        </div>
+      </div>
+      
+      <!-- 判断题 -->
+      <div v-else-if="question.type === '判断题'" class="judgment-options">
+        <div
+          v-for="option in judgmentOptions"
+          :key="option.key"
+          class="option"
+          :class="{
+            'selected': answer === option.key,
+            'correct': showAnswer && option.key === question.answer,
+            'wrong': showAnswer && answer === option.key && option.key !== question.answer
+          }"
+          @click="!showAnswer && selectAnswer(option.key)"
+        >
+          {{ option.text }}
+        </div>
+      </div>
+      
+      <!-- 简答题 -->
+      <div v-else-if="question.type === '简答题'" class="text-answer">
+        <textarea
+          v-model="answer"
+          :disabled="showAnswer"
+          @input="selectAnswer($event.target.value)"
+          placeholder="请输入你的答案..."
+        ></textarea>
       </div>
     </div>
     
-    <!-- 判断题 -->
-    <div v-else-if="question.type === '判断题'" class="judgment-options">
-      <button 
-        class="judgment-btn"
-        :class="{ 
-          'selected': userAnswer === '正确',
-          'correct': showAnswer && question.answer === '正确',
-          'wrong': showAnswer && userAnswer === '正确' && question.answer !== '正确'
-        }"
-        @click="selectAnswer('正确')"
-      >
-        正确
-      </button>
-      <button 
-        class="judgment-btn"
-        :class="{ 
-          'selected': userAnswer === '错误',
-          'correct': showAnswer && question.answer === '错误',
-          'wrong': showAnswer && userAnswer === '错误' && question.answer !== '错误'
-        }"
-        @click="selectAnswer('错误')"
-      >
-        错误
-      </button>
-    </div>
-    
-    <!-- 简答题 -->
-    <div v-else-if="question.type === '简答题'" class="short-answer">
-      <textarea
-        v-model="userAnswer"
-        placeholder="请输入你的答案..."
-        :disabled="showAnswer"
-        @input="selectAnswer($event.target.value)"
-      ></textarea>
-    </div>
-    
-    <!-- 答案解析 -->
+    <!-- 显示答案和解析 -->
     <div v-if="showAnswer" class="answer-analysis">
       <div class="correct-answer">
-        <strong>正确答案：</strong>{{ question.answer }}
+        <strong>正确答案：</strong>
+        <span>{{ question.answer }}</span>
       </div>
-      <div class="analysis" v-if="question.analysis">
+      <div v-if="question.analysis" class="analysis">
         <strong>解析：</strong>
         <p>{{ question.analysis }}</p>
       </div>
@@ -74,11 +68,8 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-
 export default {
   name: 'QuestionCard',
-  
   props: {
     question: {
       type: Object,
@@ -89,57 +80,31 @@ export default {
       default: false
     }
   },
-  
   emits: ['answer-selected'],
   
-  setup(props, { emit }) {
-    const userAnswer = ref('')
-    
-    // 计算题目类型显示文本
-    const getQuestionTypeText = computed(() => {
-      return props.question.type || '未知类型'
-    })
-    
-    // 获取处理后的题目内容
-    const getQuestionContent = computed(() => {
-      return props.question.content || ''
-    })
-    
-    // 解析选择题选项
-    const options = computed(() => {
-      if (props.question.type !== '选择题') return []
-      
-      // 选择题选项固定为 A, B, C, D，但需要添加选项内容
-      return [
-        { key: 'A', text: 'A. 单链表的存储空间必须是连续的' },
-        { key: 'B', text: 'B. 单链表的节点大小必须相同' },
-        { key: 'C', text: 'C. 单链表的存储空间是动态分配的，不要求连续' },
-        { key: 'D', text: 'D. 单链表的存储空间必须在编译时确定' }
-      ]
-    })
-    
-    // 选择答案
-    const selectAnswer = (answer) => {
-      userAnswer.value = answer
-      emit('answer-selected', {
-        questionId: props.question.id,
-        answer: answer
-      })
-    }
-
-    // 判断题答案显示转换
-    const getJudgmentAnswer = computed(() => {
-      if (props.question.type !== '判断题') return ''
-      return props.question.answer === '正确' ? 'true' : 'false'
-    })
-    
+  data() {
     return {
-      userAnswer,
-      getQuestionTypeText,
-      getQuestionContent,
-      options,
-      selectAnswer,
-      getJudgmentAnswer
+      answer: '',
+      options: [
+        { key: 'A', text: 'A. 单链表必须存储在连续的内存空间中' },
+        { key: 'B', text: 'B. 单链表的存储空间可以是不连续的' },
+        { key: 'C', text: 'C. 单链表的每个节点有两个指针域' },
+        { key: 'D', text: 'D. 单链表的插入删除必须移动大量元素' }
+      ],
+      judgmentOptions: [
+        { key: '正确', text: '正确' },
+        { key: '错误', text: '错误' }
+      ]
+    }
+  },
+  
+  methods: {
+    selectAnswer(value) {
+      this.answer = value
+      this.$emit('answer-selected', {
+        questionId: this.question.id,
+        answer: value
+      })
     }
   }
 }
@@ -160,16 +125,16 @@ export default {
   margin-bottom: 16px;
 }
 
+.question-number {
+  color: #666;
+}
+
 .question-type {
   background: #1976d2;
   color: white;
   padding: 4px 12px;
   border-radius: 4px;
   font-size: 14px;
-}
-
-.question-number {
-  color: #666;
 }
 
 .question-content {
@@ -191,7 +156,7 @@ export default {
   transition: all 0.3s;
 }
 
-.option:hover {
+.option:hover:not(.selected):not(.correct):not(.wrong) {
   background: #f5f5f5;
 }
 
@@ -236,13 +201,15 @@ export default {
 }
 
 /* 简答题样式 */
-.short-answer textarea {
+.text-answer textarea {
   width: 100%;
-  min-height: 100px;
+  min-height: 120px;
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   resize: vertical;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 /* 答案解析样式 */

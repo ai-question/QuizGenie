@@ -10,6 +10,8 @@ import org.springframework.util.DigestUtils;
 import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Data;
+import lombok.AllArgsConstructor;
 
 @Service
 public class LoginService {
@@ -18,7 +20,15 @@ public class LoginService {
     private UserMapper userMapper;
     
     // 存储token和用户名的映射关系
-    private static final Map<String, String> tokenMap = new ConcurrentHashMap<>();
+    private static final Map<String, TokenInfo> tokenMap = new ConcurrentHashMap<>();
+    private static final long TOKEN_EXPIRE_TIME = 24 * 60 * 60 * 1000; // 24小时
+    
+    @Data
+    @AllArgsConstructor
+    private static class TokenInfo {
+        private String username;
+        private long expireTime;
+    }
     
     public LoginResponse login(LoginRequest request) {
         if (request.getUsername() == null || request.getPassword() == null) {
@@ -38,13 +48,19 @@ public class LoginService {
         
         // 生成token
         String token = UUID.randomUUID().toString();
-        tokenMap.put(token, user.getUsername());
+        tokenMap.put(token, new TokenInfo(user.getUsername(), 
+            System.currentTimeMillis() + TOKEN_EXPIRE_TIME));
         
         return new LoginResponse(token, user.getUsername(), user.getAvatar());
     }
     
     public String getUsernameByToken(String token) {
-        return tokenMap.get(token);
+        TokenInfo tokenInfo = tokenMap.get(token);
+        if (tokenInfo != null && System.currentTimeMillis() < tokenInfo.getExpireTime()) {
+            return tokenInfo.getUsername();
+        }
+        tokenMap.remove(token);
+        return null;
     }
     
     public void logout(String token) {

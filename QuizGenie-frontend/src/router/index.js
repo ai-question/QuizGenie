@@ -4,6 +4,7 @@ import Register from '../views/Register.vue'
 import Home from '../views/Home.vue'
 import QuizView from '../views/QuizView.vue'
 import DashboardView from '../views/DashboardView.vue'
+import axios from 'axios'
 
 const routes = [
   {
@@ -28,9 +29,9 @@ const routes = [
         component: DashboardView
       },
       {
-        path: 'quiz',
+        path: 'quiz/:id?',
         name: 'Quiz',
-        component: QuizView
+        component: () => import('../views/QuizView.vue')
       },
       {
         path: 'manage',
@@ -55,14 +56,32 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   if (to.matched.some(record => record.meta.requiresAuth)) {
-    const isAuthenticated = localStorage.getItem('token')
+    const token = localStorage.getItem('token')
     
-    if (!isAuthenticated) {
+    if (!token) {
       next('/login')
     } else {
-      next()
+      try {
+        // 验证 token 有效性
+        const response = await axios.get('/api/auth/verify', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        if (response.data.code === 200) {
+          next()
+        } else {
+          localStorage.removeItem('token')
+          localStorage.removeItem('username')
+          next('/login')
+        }
+      } catch (error) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('username')
+        next('/login')
+      }
     }
   } else {
     next()

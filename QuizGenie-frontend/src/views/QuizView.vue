@@ -1,23 +1,5 @@
 <template>
   <div class="quiz-container">
-    <!-- 添加获取题目按钮 -->
-    <div class="fetch-questions-section">
-      <input 
-        type="number" 
-        v-model="targetSetId"
-        placeholder="请输入题目集ID"
-        class="set-id-input"
-      >
-      <button 
-        @click="fetchQuestionsBySetId" 
-        class="fetch-btn" 
-        :disabled="!targetSetId || loading"
-      >
-        <i class="fas fa-download"></i>
-        获取题目
-      </button>
-    </div>
-
     <!-- 添加题目集信息显示 -->
     <div v-if="quizInfo.title" class="quiz-info">
       <h1 class="quiz-title">{{ quizInfo.title }}</h1>
@@ -39,7 +21,7 @@
       <div class="upload-box" @click="triggerFileInput">
         <i class="fas fa-cloud-upload-alt"></i>
         <p>点击或拖拽文件到此处上传</p>
-        <span class="upload-hint">支持 .txt, .doc, .docx, .pdf 格式</span>
+        <span class="upload-hint">支持 .txt, .doc, .docx, .pdf 格式，文件大小不超过500MB</span>
       </div>
       
       <!-- 替换原有的题目数量输入框 -->
@@ -107,7 +89,7 @@
       <p>题目加载中...</p>
     </div>
 
-    <template v-else>
+    <template v-else-if="questions.length > 0">
       <!-- 进度条 -->
       <div class="progress-bar">
         <div 
@@ -156,16 +138,18 @@
     <!-- 错误提示 -->
     <div v-if="error" class="error-message">
       {{ error }}
-      <button @click="fetchQuestions">重试</button>
+      <button @click="fetchQuestionSet">重试</button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import QuestionCard from '../components/QuestionCard.vue'
 import ResultCard from '../components/ResultCard.vue'
 import { quizApi } from '../api/quiz'
+import { ElMessage } from 'element-plus'
 
 export default {
   name: 'QuizView',
@@ -174,6 +158,7 @@ export default {
     ResultCard
   },
   setup() {
+    const route = useRoute()
     const questions = ref([])
     const answers = ref({})
     const showResults = ref(false)
@@ -260,6 +245,15 @@ export default {
       const file = event.target.files[0]
       if (!file) return
 
+      // 检查文件大小（500MB = 500 * 1024 * 1024 bytes）
+      const maxSize = 500 * 1024 * 1024
+      if (file.size > maxSize) {
+        ElMessage.error('文件大小不能超过500MB')
+        // 清空文件选择
+        event.target.value = ''
+        return
+      }
+
       uploadStatus.value = {
         type: 'info',
         message: '文件上传中...'
@@ -287,6 +281,63 @@ export default {
           type: 'error',
           message: err.response?.data || '文件上传失败，请重试'
         }
+      }
+    }
+
+    // 修改题目类型转换函数
+    const convertQuestionType = (type) => {
+      switch (type) {
+        case '选择题':
+          return 'choice'
+        case '判断题':
+          return 'judgment'
+        case '简答题':
+          return 'text'
+        default:
+          return 'text'
+      }
+    }
+
+    // 修改获取题目选项的函数
+    const getQuestionOptions = (question) => {
+      if (question.type === '选择题') {
+        // 假设题目内容格式为：
+        // 题干
+        // A. 选项1
+        // B. 选项2
+        // C. 选项3
+        // D. 选项4
+        const lines = question.content.split('\n')
+        const options = lines.slice(1).map(line => {
+          if (line.trim()) {
+            const key = line.charAt(0)  // 获取选项标签 (A/B/C/D)
+            const text = line.slice(2).trim()  // 获取选项内容
+            return { key, text }
+          }
+          return null
+        }).filter(Boolean)  // 过滤掉空选项
+        
+        return options
+      } else if (question.type === '判断题') {
+        return [
+          { key: '正确', text: '正确' },
+          { key: '错误', text: '错误' }
+        ]
+      }
+      return []
+    }
+
+    // 修改题目数据处理
+    const processQuestionData = (question) => {
+      return {
+        id: question.id,
+        questionNumber: question.questionNumber,
+        title: question.type === '选择题' ? question.content.split('\n')[0] : question.content,
+        type: convertQuestionType(question.type),
+        content: question.content,
+        options: getQuestionOptions(question),
+        answer: question.answer,
+        analysis: question.analysis
       }
     }
 
@@ -358,16 +409,6 @@ export default {
       } finally {
         loading.value = false
       }
-    }
-
-    // 添加问题类型转换函数
-    const convertQuestionType = (backendType) => {
-      const typeMap = {
-        '选择题': 'choice',
-        '判断题': 'boolean',
-        '简答题': 'text'
-      }
-      return typeMap[backendType] || 'text'
     }
 
     // 处理答案选择
@@ -446,6 +487,48 @@ export default {
       }
     }
 
+    // 修改获取题目集的函数
+    const fetchQuestionSet = async () => {
+      const setId = route.params.id
+      if (!setId) return
+      
+      loading.value = true
+      error.value = null
+      
+      try {
+        const response = await quizApi.getQuestionSet(setId)
+        const data = response.data
+        
+        // 更新题目集信息
+        quizInfo.value = {
+          title: data.title,
+          description: data.description,
+          questionCount: data.questionCount
+        }
+        
+        // 直接使用后端返回的题目数据
+        questions.value = data.questions
+        
+        // 重置答题状态
+        answers.value = {}
+        showResults.value = false
+        analysisData.value = {}
+        
+      } catch (err) {
+        console.error('获取题目集失败:', err)
+        error.value = err.response?.data?.message || '获取题目失败'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // 监听路由参数变化
+    watch(() => route.params.id, (newId) => {
+      if (newId) {
+        fetchQuestionSet()
+      }
+    }, { immediate: true })
+
     // 组件挂载时获取题目
     onMounted(() => {
       // 只有当有 currentSetId 时才自动获取题目
@@ -480,7 +563,11 @@ export default {
       fetchQuestionsBySetId,
       quizInfo,
       questionConfig,
-      totalQuestionCount
+      totalQuestionCount,
+      fetchQuestionSet,
+      convertQuestionType,
+      getQuestionOptions,
+      processQuestionData
     }
   }
 }
