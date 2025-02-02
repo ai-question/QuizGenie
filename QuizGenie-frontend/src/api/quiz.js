@@ -39,12 +39,12 @@ api.interceptors.response.use(response => {
 export const quizApi = {
   // 获取所有题目集
   getAllQuestionSets() {
-    return api.get('/upload/sets')
+    return api.get('/questions/sets')
   },
 
   // 获取题目集
   getQuestionSet(id) {
-    return api.get(`/upload/sets/${id}`)
+    return api.get(`/questions/sets/${id}`)
   },
 
   // 上传文件并创建题目集
@@ -63,6 +63,29 @@ export const quizApi = {
   submitAnswers(setId, answers) {
     return api.post(`/upload/sets/${setId}/submit`, {
       answers
+    })
+  },
+
+  // 获取题目统计数据
+  getQuestionStats() {
+    return api.get('/questions/stats')
+  },
+
+  // 导出题目集
+  exportQuestionSet(setId) {
+    return api.get(`/questions/export/${setId}`, {
+      responseType: 'blob'  // 设置响应类型为blob
+    })
+  },
+
+  // 导入题目集
+  importQuestionSet(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/questions/import', formData, {
+      headers: {
+        // 不要设置 Content-Type，让浏览器自动处理
+      }
     })
   }
 } 

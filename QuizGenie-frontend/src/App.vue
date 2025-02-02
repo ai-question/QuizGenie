@@ -1,5 +1,28 @@
+<script setup>
+import { ref, provide, watch } from 'vue'
+import { RouterView } from 'vue-router'
+
+const username = ref(localStorage.getItem('username') || '未登录')
+
+// 提供更新用户名的方法
+const updateUsername = (newUsername) => {
+  username.value = newUsername
+}
+
+provide('updateUsername', updateUsername)
+// 同时提供 username ref，这样子组件可以直接使用
+provide('username', username)
+
+// 监听 username 的变化
+watch(username, (newValue) => {
+  localStorage.setItem('username', newValue)
+})
+</script>
+
 <template>
-  <router-view></router-view>
+  <div class="app-container">
+    <RouterView />
+  </div>
 </template>
 
 <style>

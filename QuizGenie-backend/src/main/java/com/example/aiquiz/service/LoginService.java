@@ -30,6 +30,13 @@ public class LoginService {
         private long expireTime;
     }
     
+    public String generateToken(String username) {
+        String token = UUID.randomUUID().toString();
+        tokenMap.put(token, new TokenInfo(username, 
+            System.currentTimeMillis() + TOKEN_EXPIRE_TIME));
+        return token;
+    }
+    
     public LoginResponse login(LoginRequest request) {
         if (request.getUsername() == null || request.getPassword() == null) {
             throw new RuntimeException("用户名和密码不能为空");
@@ -46,10 +53,8 @@ public class LoginService {
             throw new RuntimeException("密码错误");
         }
         
-        // 生成token
-        String token = UUID.randomUUID().toString();
-        tokenMap.put(token, new TokenInfo(user.getUsername(), 
-            System.currentTimeMillis() + TOKEN_EXPIRE_TIME));
+        // 使用generateToken方法生成token
+        String token = generateToken(user.getUsername());
         
         return new LoginResponse(token, user.getUsername(), user.getAvatar());
     }

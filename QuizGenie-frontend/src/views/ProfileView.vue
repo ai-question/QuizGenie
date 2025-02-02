@@ -68,20 +68,60 @@
             <div class="stat-label">连续答题天数</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value">{{ userStats.rank }}</div>
-            <div class="stat-label">排名</div>
+            <div class="stat-value">{{ userStats.questionSets }}</div>
+            <div class="stat-label">生成题目集数</div>
           </div>
         </div>
       </div>
     </div>
+
+    <el-dialog v-model="editDialogVisible" title="编辑资料" width="30%">
+      <el-form :model="editForm" label-width="80px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="editForm.username" placeholder="请输入用户名"></el-input>
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" placeholder="请输入邮箱"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitEdit">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="30%">
+      <el-form :model="passwordForm" label-width="100px" :rules="passwordRules" ref="passwordFormRef">
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input v-model="passwordForm.oldPassword" type="password" show-password></el-input>
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password></el-input>
+        </el-form-item>
+        <el-form-item label="确认新密码" prop="confirmPassword">
+          <el-input v-model="passwordForm.confirmPassword" type="password" show-password></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="passwordDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitPasswordChange">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { userApi } from '../api/user'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
+const updateUsername = inject('updateUsername')
 const defaultAvatar = 'https://via.placeholder.com/100'
 
 const userInfo = ref({
@@ -96,8 +136,44 @@ const userStats = ref({
   totalQuestions: 0,
   correctRate: 0,
   streak: 0,
-  rank: '-'
+  questionSets: 0
 })
+
+const editDialogVisible = ref(false)
+const passwordDialogVisible = ref(false)
+const passwordFormRef = ref(null)
+
+const editForm = ref({
+  username: '',
+  email: ''
+})
+
+const passwordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const passwordRules = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== passwordForm.value.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
 
 // 获取用户信息
 const fetchUserInfo = async () => {
@@ -111,6 +187,23 @@ const fetchUserInfo = async () => {
     }
   } catch (error) {
     ElMessage.error('获取用户信息失败')
+  }
+}
+
+// 获取用户统计数据
+const fetchUserStats = async () => {
+  try {
+    const response = await userApi.getUserStats()
+    if (response.data) {
+      userStats.value = {
+        totalQuestions: response.data.totalQuestions || 0,
+        correctRate: response.data.correctRate || 0,
+        streak: response.data.streak || 0,
+        questionSets: response.data.questionSets || 0
+      }
+    }
+  } catch (error) {
+    ElMessage.error('获取统计数据失败')
   }
 }
 
@@ -144,14 +237,63 @@ const handleAvatarUpload = async (event) => {
 
 onMounted(() => {
   fetchUserInfo()
+  fetchUserStats()
 })
 
 const handleEdit = () => {
-  ElMessage.info('编辑资料功能开发中...')
+  editForm.value.username = userInfo.value.username
+  editForm.value.email = userInfo.value.email
+  editDialogVisible.value = true
 }
 
 const handleChangePassword = () => {
-  ElMessage.info('修改密码功能开发中...')
+  passwordDialogVisible.value = true
+}
+
+const submitEdit = async () => {
+  try {
+    const response = await userApi.updateUserInfo(editForm.value)
+    if (response.data.code === 200) {
+      ElMessage.success('更新成功')
+      editDialogVisible.value = false
+      if (editForm.value.username) {
+        localStorage.setItem('username', editForm.value.username)
+        updateUsername(editForm.value.username)
+      }
+      // 获取新token并更新
+      const newToken = response.headers['authorization']
+      if (newToken) {
+        localStorage.setItem('token', newToken.replace('Bearer ', ''))
+      }
+      fetchUserInfo()
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '更新失败')
+  }
+}
+
+const submitPasswordChange = async () => {
+  if (!passwordFormRef.value) return
+  
+  await passwordFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        const response = await userApi.updatePassword(passwordForm.value)
+        if (response.data.code === 200) {
+          ElMessage.success('密码修改成功')
+          passwordDialogVisible.value = false
+          passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+          // 清除本地存储的登录信息
+          localStorage.removeItem('token')
+          localStorage.removeItem('username')
+          // 跳转到登录页
+          router.push('/login')
+        }
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || '密码修改失败')
+      }
+    }
+  })
 }
 </script>
 

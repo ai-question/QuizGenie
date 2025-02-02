@@ -30,7 +30,7 @@
         <div
           v-for="option in judgmentOptions"
           :key="option.key"
-          class="option"
+          class="judgment-btn"
           :class="{
             'selected': answer === option.key,
             'correct': showAnswer && option.key === question.answer,
@@ -180,24 +180,42 @@ export default {
   display: flex;
   gap: 20px;
   justify-content: center;
+  margin: 20px 0;
 }
 
 .judgment-btn {
-  padding: 10px 30px;
+  min-width: 120px;
+  padding: 12px 24px;
   border: 2px solid #ddd;
-  border-radius: 4px;
+  border-radius: 8px;
   background: white;
   cursor: pointer;
   transition: all 0.3s;
+  text-align: center;
+  font-size: 16px;
 }
 
-.judgment-btn:hover {
+.judgment-btn:hover:not(.selected):not(.correct):not(.wrong) {
   background: #f5f5f5;
+  border-color: #42a5f5;
 }
 
 .judgment-btn.selected {
   background: #e3f2fd;
   border-color: #1976d2;
+  color: #1976d2;
+}
+
+.judgment-btn.correct {
+  background: #c8e6c9;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.judgment-btn.wrong {
+  background: #ffcdd2;
+  border-color: #f44336;
+  color: #c62828;
 }
 
 /* 简答题样式 */

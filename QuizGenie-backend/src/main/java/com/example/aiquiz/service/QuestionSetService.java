@@ -27,6 +27,9 @@ import com.example.aiquiz.dto.QuestionCountConfig;
 import com.example.aiquiz.model.User;
 import com.example.aiquiz.service.UserService;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 @Service
 public class QuestionSetService {
@@ -212,5 +215,152 @@ public class QuestionSetService {
         
         // 只返回当前用户的题目集
         return questionSetMapper.findByUserId(currentUser.getId());
+    }
+    
+    public Map<String, Object> getQuestionStats(String username) {
+        // 获取用户ID
+        User user = userService.getCurrentUser();
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        Map<String, Object> stats = new HashMap<>();
+        
+        // 获取该用户的总题目集数量
+        Integer total = questionSetMapper.countByUserId(user.getId());
+        
+        // 获取今日新增的题目集数量
+        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        Integer today = questionSetMapper.countTodayByUserId(user.getId(), startOfDay);
+        
+        stats.put("total", total);
+        stats.put("today", today);
+        
+        return stats;
+    }
+    
+    public String exportQuestionSet(Long id) {
+        QuestionSet questionSet = getQuestionSet(id);
+        if (questionSet == null) {
+            throw new RuntimeException("题目集不存在");
+        }
+        
+        StringBuilder content = new StringBuilder();
+        content.append("标题: ").append(questionSet.getTitle()).append("\n");
+        content.append("描述: ").append(questionSet.getDescription()).append("\n\n");
+        
+        List<Question> questions = questionMapper.findBySetId(id);
+        for (Question question : questions) {
+            content.append("题号: ").append(question.getQuestionNumber()).append("\n");
+            content.append("类型: ").append(question.getType()).append("\n");
+            content.append("内容: ").append(question.getContent()).append("\n");
+            content.append("答案: ").append(question.getAnswer()).append("\n");
+            content.append("解析: ").append(question.getAnalysis()).append("\n\n");
+        }
+        
+        return content.toString();
+    }
+    
+    @Transactional
+    public QuestionSet importQuestionSet(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("文件不能为空");
+        }
+        
+        String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+        String[] lines = content.split("\n");
+        
+        if (lines.length < 2) {
+            throw new RuntimeException("文件格式不正确");
+        }
+        
+        // 获取当前用户
+        User currentUser = userService.getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("用户未登录");
+        }
+        
+        QuestionSet questionSet = new QuestionSet();
+        questionSet.setUserId(currentUser.getId());
+        
+        try {
+            String title = lines[0].substring(4).trim();
+            String description = lines[1].substring(4).trim();
+            
+            // 验证标题和描述不为空
+            if (title.isEmpty() || description.isEmpty()) {
+                throw new RuntimeException("标题或描述不能为空");
+            }
+            
+            questionSet.setTitle(title);
+            questionSet.setDescription(description);
+            questionSet.setCreateTime(LocalDateTime.now());
+            questionSet.setUpdateTime(LocalDateTime.now());
+            questionSet.setQuestionCount(0);  // 初始化题目数量为0
+            
+            questionSetMapper.insert(questionSet);
+            
+            // 解析题目
+            List<Question> questions = parseQuestionsFromContent(lines, questionSet.getId());
+            if (questions.isEmpty()) {
+                throw new RuntimeException("未找到有效题目");
+            }
+            
+            // 更新题目数量
+            questionSet.setQuestionCount(questions.size());
+            questionSetMapper.updateQuestionCount(questionSet.getId(), questions.size());
+            
+            questionSet.setQuestions(questions);
+            
+            // 更新统计数据（可选，因为数据库查询会自动反映最新数据）
+            Map<String, Object> stats = getQuestionStats(currentUser.getUsername());
+            
+            return questionSet;
+            
+        } catch (Exception e) {
+            // 回滚事务
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            throw new RuntimeException("导入失败：" + e.getMessage());
+        }
+    }
+    
+    private List<Question> parseQuestionsFromContent(String[] lines, Long setId) {
+        List<Question> questions = new ArrayList<>();
+        Question currentQuestion = null;
+        
+        for (int i = 3; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) continue;
+            
+            if (line.startsWith("题号:")) {
+                if (currentQuestion != null) {
+                    questions.add(currentQuestion);
+                }
+                currentQuestion = new Question();
+                currentQuestion.setSetId(setId);
+                currentQuestion.setQuestionNumber(Integer.parseInt(line.substring(3).trim()));
+            } else if (currentQuestion != null) {
+                if (line.startsWith("类型:")) {
+                    currentQuestion.setType(line.substring(3).trim());
+                } else if (line.startsWith("内容:")) {
+                    currentQuestion.setContent(line.substring(3).trim());
+                } else if (line.startsWith("答案:")) {
+                    currentQuestion.setAnswer(line.substring(3).trim());
+                } else if (line.startsWith("解析:")) {
+                    currentQuestion.setAnalysis(line.substring(3).trim());
+                }
+            }
+        }
+        
+        if (currentQuestion != null) {
+            questions.add(currentQuestion);
+        }
+        
+        // 保存所有题目
+        for (Question question : questions) {
+            questionMapper.insert(question);
+        }
+        
+        return questions;
     }
 } 

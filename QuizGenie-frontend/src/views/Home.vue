@@ -32,13 +32,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { authApi } from '../api/auth'
+import { userApi } from '../api/user'
 
 const router = useRouter()
-const username = ref('')
+const updateUsername = inject('updateUsername')
+const username = inject('username')
 
 const tabs = [
   { name: '首页', path: '/home' },
@@ -47,15 +49,12 @@ const tabs = [
   { name: '个人中心', path: '/home/profile' }
 ]
 
-onMounted(() => {
-  username.value = localStorage.getItem('username') || '未登录'
-})
-
 const handleLogout = async () => {
   try {
     await authApi.logout()
     localStorage.removeItem('token')
     localStorage.removeItem('username')
+    updateUsername('未登录')
     router.push('/login')
     ElMessage.success('已退出登录')
   } catch (error) {
@@ -70,6 +69,31 @@ const isActive = (path) => {
   }
   return router.currentRoute.value.path.startsWith(path)
 }
+
+// 更新用户名的方法
+const updateLocalUsername = (newUsername) => {
+  updateUsername(newUsername)
+}
+
+// 如果有需要，可以在组件挂载时获取最新的用户信息
+const fetchUserInfo = async () => {
+  try {
+    const response = await userApi.getUserInfo()
+    if (response.data.code === 200) {
+      const newUsername = response.data.data.username
+      updateLocalUsername(newUsername)
+    }
+  } catch (error) {
+    console.error('获取用户信息失败', error)
+  }
+}
+
+// 在组件挂载时获取用户信息
+onMounted(() => {
+  if (localStorage.getItem('token')) {
+    fetchUserInfo()
+  }
+})
 </script>
 
 <style scoped>

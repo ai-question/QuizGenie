@@ -21,4 +21,13 @@ public interface UserMapper {
 
     @Update("UPDATE user SET avatar = #{avatar} WHERE id = #{userId}")
     void updateAvatar(@Param("userId") Long userId, @Param("avatar") String avatar);
+
+    @Update("UPDATE user SET email = #{email} WHERE id = #{id}")
+    int updateEmail(@Param("id") Long id, @Param("email") String email);
+
+    @Update("UPDATE user SET password = #{password} WHERE id = #{id}")
+    void updatePassword(@Param("id") Long id, @Param("password") String password);
+
+    @Update("UPDATE user SET username = #{username} WHERE id = #{id}")
+    int updateUsername(@Param("id") Long id, @Param("username") String username);
 } 

@@ -1,12 +1,9 @@
 package com.example.aiquiz.mapper;
 
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
 import com.example.aiquiz.model.QuestionSet;
+import java.time.LocalDateTime;
 import java.util.List;
-import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface QuestionSetMapper {
@@ -20,4 +17,28 @@ public interface QuestionSetMapper {
             "VALUES (#{userId}, #{title}, #{description}, #{questionCount}, #{createTime}, #{updateTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(QuestionSet questionSet);
+
+    @Select("SELECT COUNT(*) FROM question_set WHERE user_id = #{userId}")
+    Integer countByUserId(Long userId);
+
+    @Select("SELECT COUNT(*) FROM question_set WHERE user_id = #{userId} AND create_time >= #{startOfDay}")
+    Integer countTodayByUserId(@Param("userId") Long userId, @Param("startOfDay") LocalDateTime startOfDay);
+
+    @Update("UPDATE question_set SET question_count = #{count} WHERE id = #{id}")
+    void updateQuestionCount(@Param("id") Long id, @Param("count") int count);
+
+    @Select("SELECT COUNT(*) FROM question WHERE set_id IN (SELECT id FROM question_set WHERE user_id = #{userId})")
+    Integer countTotalQuestionsByUserId(Long userId);
+
+    @Select("SELECT COALESCE(AVG(CASE WHEN user_answer = answer THEN 1 ELSE 0 END), 0) " +
+            "FROM user_answer WHERE user_id = #{userId}")
+    Double getCorrectRateByUserId(Long userId);
+
+    @Select("SELECT COUNT(DISTINCT DATE(answer_time)) " +
+            "FROM user_answer " +
+            "WHERE user_id = #{userId} " +
+            "AND answer_time >= (SELECT MAX(answer_time) FROM user_answer WHERE user_id = #{userId}) - INTERVAL '30' DAY " +
+            "GROUP BY DATE(answer_time) " +
+            "ORDER BY DATE(answer_time) DESC")
+    Integer getAnswerStreakByUserId(Long userId);
 } 

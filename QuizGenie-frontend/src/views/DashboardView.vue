@@ -28,7 +28,7 @@
       </div>
     </div>
     
-    <div class="stats-section">
+    <!-- <div class="stats-section">
       <div class="stat-item">
         <div class="stat-label">总答题数</div>
         <div class="stat-value">{{ stats.totalQuestions }}</div>
@@ -41,7 +41,7 @@
         <div class="stat-label">连续答题</div>
         <div class="stat-value">{{ stats.streak }} 天</div>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 

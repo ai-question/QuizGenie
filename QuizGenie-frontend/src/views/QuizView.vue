@@ -167,7 +167,7 @@ export default {
     const submitting = ref(false)
     const analysisData = ref({})
     const correctCount = ref(0)
-    const questionCount = ref(10) // 默认生成10道题
+    const questionCount = ref(5) // 默认生成5道题
 
     // 新增的文件上传相关响应式数据
     const fileInput = ref(null)
@@ -186,9 +186,9 @@ export default {
 
     // 题目数量配置
     const questionConfig = ref({
-      choiceCount: 4,      // 默认4道选择题
-      judgmentCount: 4,    // 默认4道判断题
-      shortAnswerCount: 2  // 默认2道简答题
+      choiceCount: 2,      // 默认2道选择题
+      judgmentCount: 2,    // 默认2道判断题
+      shortAnswerCount: 1  // 默认1道简答题
     })
 
     // 计算总题目数

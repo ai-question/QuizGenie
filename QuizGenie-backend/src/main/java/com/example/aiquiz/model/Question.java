@@ -1,15 +1,17 @@
 package com.example.aiquiz.model;
 
 import java.time.LocalDateTime;
+import lombok.Data;
 
+@Data
 public class Question {
     private Long id;
     private Long setId;
-    private Integer questionNumber;
-    private String type;
-    private String content;
-    private String answer;
-    private String analysis;
+    private Integer questionNumber = 0;
+    private String type = "";
+    private String content = "";
+    private String answer = "";
+    private String analysis = "";
     private LocalDateTime createTime;
     
     public Question() {}
