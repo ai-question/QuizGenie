@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Select;
 import com.example.aiquiz.model.Question;
 import java.util.List;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Delete;
 
 @Mapper
 public interface QuestionMapper {
@@ -16,4 +17,7 @@ public interface QuestionMapper {
     
     @Select("SELECT * FROM question WHERE set_id = #{setId} ORDER BY question_number")
     List<Question> findBySetId(Long setId);
+
+    @Delete("DELETE FROM question WHERE set_id = #{setId}")
+    void deleteBySetId(Long setId);
 } 

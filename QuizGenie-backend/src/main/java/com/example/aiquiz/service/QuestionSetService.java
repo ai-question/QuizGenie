@@ -363,4 +363,11 @@ public class QuestionSetService {
         
         return questions;
     }
+    
+    public void deleteQuestionSet(Long id) {
+        // 先删除关联的题目
+        questionMapper.deleteBySetId(id);
+        // 再删除题目集
+        questionSetMapper.deleteById(id);
+    }
 } 

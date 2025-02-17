@@ -41,6 +41,13 @@
                 >
                   <i class="fas fa-download"></i>
                 </button>
+                <button 
+                  class="delete-btn"
+                  @click.stop="handleDelete(set.id)"
+                  title="删除题目集"
+                >
+                  <i class="fas fa-trash-alt"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -92,7 +99,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { quizApi } from '../api/quiz'
-import { ElMessage, ElDialog } from 'element-plus'
+import { ElMessage, ElDialog, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const stats = ref({
@@ -204,6 +211,32 @@ const importFile = async (file) => {
 let refreshInterval
 const startAutoRefresh = () => {
   refreshInterval = setInterval(fetchStats, 60000) // 每分钟刷新一次
+}
+
+// 添加删除方法
+const handleDelete = async (setId) => {
+  try {
+    // 使用 Element Plus 的确认对话框
+    await ElMessageBox.confirm(
+      '确定要删除这个题目集吗?',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    await quizApi.deleteQuestionSet(setId)
+    ElMessage.success('删除成功')
+    // 重新获取题目集列表
+    fetchQuestionSets()
+    await fetchStats()
+  } catch (error) {
+    if (error !== 'cancel') { // 用户取消删除不显示错误提示
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 onMounted(async () => {
@@ -397,5 +430,23 @@ h2 {
 
 .action-btn.primary:hover {
   background: #2196f3;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #f56c6c;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: all 0.3s;
+}
+
+.delete-btn:hover {
+  color: #ff4949;
+}
+
+/* 确保删除按钮和导出按钮之间有适当间距 */
+.export-btn + .delete-btn {
+  margin-left: 4px;
 }
 </style> 

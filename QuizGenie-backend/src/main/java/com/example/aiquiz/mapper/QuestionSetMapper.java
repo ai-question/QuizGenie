@@ -41,4 +41,7 @@ public interface QuestionSetMapper {
             "GROUP BY DATE(answer_time) " +
             "ORDER BY DATE(answer_time) DESC")
     Integer getAnswerStreakByUserId(Long userId);
+
+    @Delete("DELETE FROM question_set WHERE id = #{id}")
+    void deleteById(Long id);
 } 

@@ -87,5 +87,15 @@ export const quizApi = {
         // 不要设置 Content-Type，让浏览器自动处理
       }
     })
+  },
+
+  // 记录答题结果
+  recordQuizResult(result) {
+    return api.post('/quiz/record', result)
+  },
+
+  // 删除题目集
+  deleteQuestionSet(setId) {
+    return api.delete(`/questions/sets/${setId}`)
   }
 } 

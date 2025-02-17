@@ -12,6 +12,7 @@ public class WebConfig implements WebMvcConfigurer {
     
     @Autowired
     private TokenInterceptor tokenInterceptor;
+
     
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -23,7 +24,10 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-            .allowedOrigins("http://localhost:3000")
+            .allowedOrigins(
+                "http://121.43.181.190:3000",  // 添加这个源
+                "http://localhost:3000"
+            )
             .allowedMethods("*")
             .allowedHeaders("*")
             .allowCredentials(false)

@@ -433,6 +433,13 @@ export default {
           return count + (String(userAnswer) === String(q.answer) ? 1 : 0)
         }, 0)
         
+        // 记录答题结果
+        await quizApi.recordQuizResult({
+          questionSetId: route.params.id || currentSetId.value, // 使用路由参数或当前题目集ID
+          correctCount: correctCount.value,
+          totalCount: questions.value.length
+        })
+        
         // 显示结果
         showResults.value = true
         
